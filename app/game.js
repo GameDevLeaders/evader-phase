@@ -1,4 +1,4 @@
-var game = new Phaser.Game(350, 650, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+var game = new Phaser.Game(350, 650, Phaser.AUTO, '', { preload: preload, create: create, update: update, render: render });
 
 var map = [
   [0,0,1],
@@ -9,7 +9,7 @@ var map = [
   [1,1,0]
 ];
 
-var player,
+var playerGroup,
   cursors,
   enemyGroup,
   enemy;
@@ -21,57 +21,88 @@ function preload() {
 
 function create() {
   game.physics.startSystem(Phaser.Physics.ARCADE);
-
-  player = game.add.sprite(0, 0, 'ship');
-  player.x = game.width/2 - player.width/2;
-  player.y = game.height - player.height - 5;
-  
   enemyGroup = game.add.group();
   enemyGroup.enableBody = true;
-
-  game.physics.arcade.enable(player);
-
   cursors = game.input.keyboard.createCursorKeys();
-
-  // game.input.keyboard.addCallbacks(this, function () {
-  //   console.log(arguments);
-  // });
-
+  createPlayer();
   createEnemies();
 }
-
+function createPlayer(){
+    playerGroup = game.add.group();
+    playerGroup.enableBody = true;
+    var x = 50, y = game.height - 100,
+        playerHBox = playerGroup.create(x, y, 'ship'),
+        playerVBox = playerGroup.create(x, y);
+    playerHBox.body.setSize(95,30,2,35);
+    playerVBox.body.setSize(30,75,35,0);
+    playerHBox.name = 'Wings';
+    playerVBox.name = 'Body';
+    
+    playerHBox.body.velocity.y = 0;
+    playerVBox.body.velocity.y = 0;
+}
+function moveLeft(){
+    var players = playerGroup.children, newX = 0;
+    for (var i = 0; i < players.length; i++) {
+        newX = players[i].body.x - step*turbo
+        if(newX >= 0){
+            players[i].body.x = newX;
+        }else{
+            break;
+        }
+    }
+}
+function moveRight(){
+    var players = playerGroup.children, newX = 0;
+    for (var i = 0; i < players.length; i++) {
+        newX = players[i].body.x + step*turbo
+        if(newX + players[i].body.width <= game.width){
+            players[i].body.x = newX;
+        }else{
+            break;
+        }
+    }
+}
+function updatePlayer(){
+}
+function updateEnemies(){
+    var enemies = enemyGroup.children;
+    for (var i = 0; i < enemies.length; i++) {
+      enemies[i].body.velocity.y = 100 * turbo;
+      if (enemies[i].body.y > game.height) {
+        enemyGroup.remove(enemies[i], true, true);
+      }
+    }
+    var lastEnemy = enemyGroup.children[enemyGroup.children.length-1];
+    if (lastEnemy.body.y > lastEnemy.body.height * 2.5) {
+      createEnemies();
+    }
+}
+function checkInputs(){
+    turbo = 1;
+    if (cursors.up.isDown) {
+        turbo = 4;
+    }
+    if (cursors.left.isDown) {
+        moveLeft();
+    } else if (cursors.right.isDown) {
+        moveRight();
+    }
+}
+function checkCollisions(){
+    game.physics.arcade.overlap(playerGroup, enemyGroup, function (player, enemy,c) {
+      console.log('COLLIDES with ' + player.name);
+//      game.paused = true;
+      enemy.destroy();
+    });
+}
+var turbo = 1, step = 6;
 
 function update() {
-  var turbo = 1;
-  player.body.velocity.x = 0;
-
-  if (game.input.keyboard.isDown(Phaser.Keyboard.T)) {
-    turbo = 4;
-  }
-
-  if (cursors.left.justDown && player.body.x - player.width > 0) {
-    player.body.x -= player.width;
-  } else if (cursors.right.justDown && player.body.x + player.width * 2 < game.width) {
-    player.body.x += player.width;
-  }
-
-  var enemies = enemyGroup.children;
-  for (var i = 0; i < enemies.length; i++) {
-    enemies[i].body.velocity.y = 100 * turbo;
-
-    if (enemies[i].body.y > game.height) {
-      enemyGroup.remove(enemies[i], true, true);
-    }
-  }
-
-  var lastEnemy = enemyGroup.children[enemyGroup.children.length-1];
-  if (lastEnemy.body.y > lastEnemy.body.height * 2.5) {
-    createEnemies();
-  }
-
-  game.physics.arcade.overlap(player, enemyGroup, function () {
-    game.paused = true;
-  });
+    updatePlayer();
+    updateEnemies();
+    checkCollisions();
+    checkInputs();
 }
 
 function createEnemies() {
@@ -99,4 +130,11 @@ function generateXForEnemy(index) {
 
 function getRandom(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+function render(){
+    enemyGroup.forEachAlive(renderGroup, this);
+    playerGroup.forEachAlive(renderGroup, this);
+}
+function renderGroup(member) {
+    game.debug.body(member);
 }
